@@ -94,42 +94,49 @@ class SessionManager{
     }
 
     public function run(){
-        $this->eioTickProcessor();
-        //$this->tickProcessor();
+        $this->tickProcessor();
     }
-    public function eioTickProcessor() {
-        $evTimerTick = new \EvTimer(0.1, 1, function ($watcher,$revents) {
-        });
-        if (true) {
-            $evSocketRead = new \EvIo($this->socket, Ev::READ, function ($watcher, $revents) {
 
-                echo "STDIN is readable\n";
-
-            });
-        };
-        echo "eioTickProcessor Loop begin\n";
-
-        while(!$this->shutdown) {
-            Ev::run(Ev::RUN_ONCE);
-            if (false) {
-                $evSocketRead->start();
-            };
-            $max = 50000;
-            while(--$max and $this->receivePacket());
-            while($this->receiveStream());
-        };
-        echo "eioTickProcessor end\n";
-    }
     private function tickProcessor(){
         $this->lastMeasure = microtime(true);
 
-        while(!$this->shutdown){
-            $start = microtime(true);
-            $max = 50000;
-            while(--$max and $this->receivePacket());
-	        while($this->receiveStream());
-            usleep(max(1, 20000 - (microtime(true) - $start) * 1000000));
+        if (true) {
+            $evLoop = new \EvLoop();
+            $socket = $this->socket;
+            $sm = $this;
+            $evTimerTick = $evLoop->timer(0.1, 0.1,function($w,$e) use ($socket,$sm) {
+                $max = 500000;
+                //while(--$max and $this->receivePacket());
+                while(true and $sm->receivePacket());
+                while($sm->receiveStream());
+            });
+
+            if(true) {
+                $evSocketRead = $evLoop->io($this->socket->getSocket(), Ev::READ, function ($w,$e) use($socket,$sm ) {
+                    echo "SocketRead\n";
+                });
+            };
+
+            echo '$this->socket->getSocket() '.$this->socket->getSocket()."\n";
+            while(!$this->shutdown) {
+                $evLoop->run(\Ev::RUN_ONCE);
+
+            };
+            if(true) {
+                $evSocketRead->stop();
+            };
+            $evTimerTick->stop();
+            $evLoop->stop();
         }
+        else {
+            while (!$this->shutdown) {
+                $start = microtime(true);
+                $max = 50000;
+                while (--$max and $this->receivePacket()) ;
+                while ($this->receiveStream()) ;
+                usleep(max(1, 20000 - (microtime(true) - $start) * 1000000));
+            }
+        };
     }
 
 

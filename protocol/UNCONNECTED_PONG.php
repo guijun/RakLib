@@ -19,7 +19,7 @@ namespace raklib\protocol;
 
 
 use raklib\RakLib;
-
+//TODO: 为这类数据包，增加一个缓冲，避免每次都创建
 class UNCONNECTED_PONG extends Packet{
     public static $ID = 0x1c;
 

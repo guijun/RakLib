@@ -364,6 +364,7 @@ class Session{
     public function handlePacket(Packet $packet){
         $this->isActive = true;
         $this->lastUpdate = microtime(true);
+        //如果已经连接成功，则解码数据包然后处理
         if($this->state === self::STATE_CONNECTED or $this->state === self::STATE_CONNECTING_2){
             if($packet::$ID >= 0x80 and $packet::$ID <= 0x8f and $packet instanceof DataPacket){ //Data packet
                 $packet->decode();
@@ -421,7 +422,7 @@ class Session{
 
         }elseif($packet::$ID > 0x00 and $packet::$ID < 0x80){ //Not Data packet :)
             $packet->decode();
-            if($packet instanceof UNCONNECTED_PING){
+            if($packet instanceof UNCONNECTED_PING){//局域网访问服务器？
                 $pk = new UNCONNECTED_PONG();
                 $pk->serverID = $this->sessionManager->getID();
                 $pk->pingID = $packet->pingID;

@@ -50,6 +50,9 @@ class SessionManager{
     //各种数据包的类的样本，在发送操作的时候，可能是从这里clone的。
     protected $packetPool = [];
 
+    //hopjoy,这个才是对象池
+    protected $packetPoolFree = [];
+
     /** @var RakLibServer */
     protected $server;
 
@@ -99,30 +102,23 @@ class SessionManager{
 
     private function tickProcessor(){
         $this->lastMeasure = microtime(true);
-
         if (true) {
             $evLoop = new \EvLoop();
-            $socket = $this->socket;
             $sm = $this;
-            $evTimerTick = $evLoop->timer(0.1, 0.1,function($w,$e) use ($socket,$sm) {
+            $evTimerTick = $evLoop->timer(0.1, 0.1,function($w,$e) use ($sm) {
                 while($sm->receiveStream());
             });
-            if(true) {
+
                 $udpsocket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
                 eio_dup2($this->socket->getSocket(),$udpsocket);
                 $evSocketRead = $evLoop->io($udpsocket, Ev::READ, function ($w,$e) use($udpsocket,$sm ) {
                     $max = 500000;
                     while(--$max and $this->receivePacket());
-                    //while(true and $sm->receivePacket());
                 });
-            };
             while(!$this->shutdown) {
                 $evLoop->run(\Ev::RUN_ONCE);
-
             };
-            if(true) {
-                $evSocketRead->stop();
-            };
+            $evSocketRead->stop();
             $evTimerTick->stop();
             $evLoop->stop();
         }
@@ -141,19 +137,22 @@ class SessionManager{
     private function receivePacket(){
         if(($len = $this->socket->readPacket($buffer, $source, $port)) > 0){
             $this->receiveBytes += $len;
+            //如果是被封的IP则直接跳过了
             if(isset($this->block[$source])){
                 return true;
             }
-
+            //这个可能是包计数器，用于加密？
             if(isset($this->ipSec[$source])){
                 $this->ipSec[$source]++;
             }else{
                 $this->ipSec[$source] = 1;
             }
-
-            if(($packet = $this->getPacketFromPool(ord($buffer{0}))) !== null){
+            $id = ord($buffer{0});
+            if(($packet = $this->getPacketFromPool($id)) !== null){
                 $packet->buffer = $buffer;
                 $this->getSession($source, $port)->handlePacket($packet);
+                //hopjoy 回收对象，避免重复创建
+                $this->putPacketToPool($id,$packet);
 	            return true;
             }elseif($buffer !== ""){
                 $this->streamRaw($source, $port, $buffer);
@@ -172,7 +171,8 @@ class SessionManager{
     }
 
     public function streamEncapsulated(Session $session, EncapsulatedPacket $packet, $flags = RakLib::PRIORITY_NORMAL){
-        $id = $session->getAddress() . ":" . $session->getPort();
+        //$id = $session->getAddress() . ":" . $session->getPort();
+        $id = sprintf('%s:%d',$session->getAddress(),$session->getPort());
         $buffer = chr(RakLib::PACKET_ENCAPSULATED) . chr(strlen($id)) . $id . chr($flags) . $packet->toBinary(true);
         $this->server->pushThreadToMainPacket($buffer);
     }
@@ -348,7 +348,8 @@ class SessionManager{
      * @return Session
      */
     public function getSession($ip, $port){
-        $id = $ip . ":" . $port;
+        //$id = $ip . ":" . $port;
+        $id= sprintf('%s:%d',$ip,$port);
         if(!isset($this->sessions[$id])){
             $this->sessions[$id] = new Session($this, $ip, $port);
         }
@@ -390,13 +391,34 @@ class SessionManager{
 	 *
 	 * @return Packet
 	 */
-	public function getPacketFromPool($id){
+	private function getPacketFromPool_real($id){
 		if(isset($this->packetPool[$id])){
 			return clone $this->packetPool[$id];
 		}
 
 		return null;
 	}
+    // hopjoy
+    public function getPacketFromPool($id) {
+        if (isset($this->packetPoolFree[$id]))
+        {
+            $pool = &$this->packetPoolFree[$id];
+            if (isset($pool[0]))
+            {
+                return array_pop($pool);
+            }
+        }
+        return $this->getPacketFromPool_real($id);
+    }
+    //hopjoy
+    public function putPacketToPool($id,$package) {
+        if (!isset($this->packetPoolFree[$id]))
+        {
+
+            $this->packetPoolFree[$id]=[];
+        };
+        $pool[]=$package;
+    }
 
     private function registerPackets(){
         $this->registerPacket(UNCONNECTED_PING::$ID, UNCONNECTED_PING::class);

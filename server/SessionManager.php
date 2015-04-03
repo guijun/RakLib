@@ -45,8 +45,9 @@ use raklib\protocol\UNCONNECTED_PING;
 use raklib\protocol\UNCONNECTED_PING_OPEN_CONNECTIONS;
 use raklib\protocol\UNCONNECTED_PONG;
 use raklib\RakLib;
-
+use ev;
 class SessionManager{
+    //各种数据包的类的样本，在发送操作的时候，可能是从这里clone的。
     protected $packetPool = [];
 
     /** @var RakLibServer */
@@ -93,9 +94,32 @@ class SessionManager{
     }
 
     public function run(){
-        $this->tickProcessor();
+        $this->eioTickProcessor();
+        //$this->tickProcessor();
     }
+    public function eioTickProcessor() {
+        $evTimerTick = new \EvTimer(0.1, 1, function ($watcher,$revents) {
+        });
+        if (true) {
+            $evSocketRead = new \EvIo($this->socket, Ev::READ, function ($watcher, $revents) {
 
+                echo "STDIN is readable\n";
+
+            });
+        };
+        echo "eioTickProcessor Loop begin\n";
+
+        while(!$this->shutdown) {
+            Ev::run(Ev::RUN_ONCE);
+            if (false) {
+                $evSocketRead->start();
+            };
+            $max = 50000;
+            while(--$max and $this->receivePacket());
+            while($this->receiveStream());
+        };
+        echo "eioTickProcessor end\n";
+    }
     private function tickProcessor(){
         $this->lastMeasure = microtime(true);
 

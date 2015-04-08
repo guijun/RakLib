@@ -102,7 +102,7 @@ class SessionManager{
 
     private function tickProcessor(){
         $this->lastMeasure = microtime(true);
-        if (false) {
+        if (true) {
             $evLoop = new \EvLoop();
             $sm = $this;
             $evTimerTick = $evLoop->timer(0.1, 0.1,function($w,$e) use ($sm) {
@@ -111,21 +111,26 @@ class SessionManager{
                 if (true) {
                     $udpsocket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
                     eio_dup2($this->socket->getSocket(), $udpsocket);
+                    while (eio_nreqs()) {
+                        // Some specific IPC or so
+                        eio_poll();
+                    }
                 }
                 else
                 {
                     $udpsocket = $this->socket->getSocket();
-                }
-                    $evSocketRead = $evLoop->io($udpsocket, Ev::READ, function ($w,$e) use($udpsocket,$sm ) {
-                    $max = 500000;
-                    while(--$max and $this->receivePacket());
-                });
+                };
+                $evSocketRead = $evLoop->io($udpsocket, Ev::READ, function ($w,$e) use($udpsocket,$sm ) {
+                        $max = 50000;
+                        while(--$max and $sm->receivePacket());
+                    });
             while(!$this->shutdown) {
                 $evLoop->run(\Ev::RUN_ONCE);
             };
             $evSocketRead->stop();
             $evTimerTick->stop();
             $evLoop->stop();
+            socket_close($udpsocket);
         }
         else {
             while (!$this->shutdown) {

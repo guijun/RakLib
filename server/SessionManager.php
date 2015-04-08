@@ -102,7 +102,7 @@ class SessionManager{
 
     private function tickProcessor(){
         $this->lastMeasure = microtime(true);
-        if (true) {
+        if (false) {
             $evLoop = new \EvLoop();
             $sm = $this;
             $evTimerTick = $evLoop->timer(0.1, 0.1,function($w,$e) use ($sm) {

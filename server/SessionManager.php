@@ -108,10 +108,15 @@ class SessionManager{
             $evTimerTick = $evLoop->timer(0.1, 0.1,function($w,$e) use ($sm) {
                 while($sm->receiveStream());
             });
-
-                $udpsocket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
-                eio_dup2($this->socket->getSocket(),$udpsocket);
-                $evSocketRead = $evLoop->io($udpsocket, Ev::READ, function ($w,$e) use($udpsocket,$sm ) {
+                if (true) {
+                    $udpsocket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
+                    eio_dup2($this->socket->getSocket(), $udpsocket);
+                }
+                else
+                {
+                    $udpsocket = $this->socket->getSocket();
+                }
+                    $evSocketRead = $evLoop->io($udpsocket, Ev::READ, function ($w,$e) use($udpsocket,$sm ) {
                     $max = 500000;
                     while(--$max and $this->receivePacket());
                 });
